@@ -7,12 +7,27 @@ Usage:
     python ai-usage-collector.py --api-url <url> --api-key <key>
 
 Data sources:
-    - Claude Code: ~/.claude/projects/ session files (token usage per session)
-    - Cursor:      ~/.cursor-tutor/usage.json or Cursor settings storage
-    - OpenAI Codex: OPENAI_API_KEY env var -> OpenAI usage API
+    - Claude Code: ~/.claude/projects/<project>/<session>.jsonl
+      JSONL files with input_tokens, output_tokens, cache tokens, model, timestamps
+      (same approach as ccusage - https://github.com/ryoppippi/ccusage)
+    - Cursor: Analytics API (Team/Enterprise, set CURSOR_API_KEY)
+      or local storage fallback (~/.config/Cursor/ state.vscdb)
+    - OpenAI Codex: Analytics API (set OPENAI_API_KEY)
+      or local ~/.codex/ session files
+
+Environment variables:
+    EINKTODO_API_URL  - einktodo API endpoint (default: einktodo.com)
+    EINKTODO_API_KEY  - einktodo API key
+    OPENAI_API_KEY    - OpenAI API key for Codex usage API
+    CURSOR_API_KEY    - Cursor Analytics API key (Team/Enterprise plans)
 
 The collector pushes a JSON payload to the configured API endpoint,
 which the e-ink device periodically fetches as a rendered bitmap.
+
+See also:
+    - Claude Code monitoring: https://github.com/anthropics/claude-code-monitoring-guide
+    - Cursor Analytics API: https://cursor.com/docs/account/teams/analytics-api
+    - OpenTelemetry export: set CLAUDE_CODE_ENABLE_TELEMETRY=1 for OTel metrics
 """
 
 import argparse
@@ -48,6 +63,7 @@ def collect_claude_code_usage(days=7):
         "total_tokens": 0,
         "cache_read_tokens": 0,
         "cache_creation_tokens": 0,
+        "models_used": {},
         "daily": {},
     }
 
@@ -104,6 +120,14 @@ def collect_claude_code_usage(days=7):
                     usage["cache_creation_tokens"] += cache_creation
                     usage["total_tokens"] += input_t + output_t
 
+                    # Track model usage (confirmed in JSONL structure)
+                    model = msg.get("model", "unknown")
+                    if model not in usage["models_used"]:
+                        usage["models_used"][model] = {"input": 0, "output": 0, "count": 0}
+                    usage["models_used"][model]["input"] += input_t
+                    usage["models_used"][model]["output"] += output_t
+                    usage["models_used"][model]["count"] += 1
+
                     # Track daily usage
                     ts = entry.get("timestamp", "")
                     if ts:
@@ -142,7 +166,31 @@ def collect_cursor_usage(days=7):
         "daily": {},
     }
 
-    # Possible Cursor data locations
+    # Try Cursor Analytics API first (Team/Enterprise plans)
+    cursor_api_key = os.environ.get("CURSOR_API_KEY")
+    if cursor_api_key:
+        try:
+            headers = {"Authorization": f"Bearer {cursor_api_key}"}
+            resp = requests.get(
+                "https://api.cursor.com/v1/analytics/usage",
+                headers=headers,
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                usage["requests"] = data.get("totalRequests", 0)
+                for entry in data.get("daily", []):
+                    day = entry.get("date", "")
+                    if day:
+                        usage["daily"][day] = {"requests": entry.get("requests", 0)}
+                print(f"[Cursor] API: {usage['requests']} requests")
+                return usage
+            else:
+                print(f"[Cursor] API returned {resp.status_code}, falling back to local")
+        except Exception as e:
+            print(f"[Cursor] API error: {e}, falling back to local")
+
+    # Possible Cursor data locations (local fallback)
     cursor_paths = [
         Path.home() / ".cursor",
         Path.home() / ".config" / "Cursor",
