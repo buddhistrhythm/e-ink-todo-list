@@ -1,0 +1,7 @@
+[
+  {
+    "_comment": "Codex CLI hooks config. Place at ~/.codex/hooks.json",
+    "hook_type": "Stop",
+    "command": "python3 __INSTALL_PATH__/tools/codex-usage-hook.py"
+  }
+]

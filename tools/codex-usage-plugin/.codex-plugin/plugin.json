@@ -1,0 +1,14 @@
+{
+  "name": "eink-usage-tracker",
+  "version": "0.1.0",
+  "description": "Track Codex AI usage and push stats to e-ink dashboard. Monitors token consumption, reasoning tokens, tool calls, and per-model breakdowns across sessions.",
+  "author": "einktodo",
+  "hooks": [
+    {
+      "hook_type": "Stop",
+      "command": "python3 ${PLUGIN_DIR}/track-usage.py",
+      "description": "Collect token usage after each Codex response"
+    }
+  ],
+  "instructions": "This plugin tracks your Codex usage and pushes stats to an e-ink dashboard.\n\nSetup:\n1. Set EINKTODO_API_KEY in your environment\n2. Optionally set EINKTODO_API_URL (default: einktodo.com)\n\nUsage data is saved to ~/.codex/eink-usage-stats.json\nStats are pushed to the e-ink API after each session turn."
+}
