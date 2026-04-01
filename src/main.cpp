@@ -7,6 +7,7 @@
 #include "led.h"
 #include "display.h"
 #include "clock.h"
+#include "aiUsage.h"
 #include "button.h"
 #include "store.h"
 #include "UpdateFiles.h"
@@ -158,7 +159,14 @@ void loop()
 #endif
 
     updating = true;
-    downloadAndDrawTodo();
+    if (currentDisplayMode == MODE_AI_USAGE)
+    {
+      downloadAndDrawAiUsage();
+    }
+    else
+    {
+      downloadAndDrawTodo();
+    }
     updating = false;
   }
 }

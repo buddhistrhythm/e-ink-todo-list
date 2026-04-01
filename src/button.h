@@ -5,6 +5,7 @@
 #include "network.h"
 #include "gpio16.h"
 #include "store.h"
+#include "aiUsage.h"
 
 OneButton button;
 
@@ -36,10 +37,19 @@ void buttonClick()
 
   if (WiFi.status() == WL_CONNECTED)
   {
-    Serial.println("force update todo");
-    cleanRunningValue();
     updating = true;
-    downloadAndDrawTodo();
+    if (currentDisplayMode == MODE_AI_USAGE)
+    {
+      Serial.println("force update AI usage");
+      memset(aiUsageLastModified, 0, sizeof(aiUsageLastModified));
+      downloadAndDrawAiUsage();
+    }
+    else
+    {
+      Serial.println("force update todo");
+      cleanRunningValue();
+      downloadAndDrawTodo();
+    }
     updating = false;
   }
 }
@@ -47,7 +57,33 @@ void buttonClick()
 void buttonDoubleClick()
 {
   Serial.println("Button double clicked");
-  // TODO: Switch to the next mode
+  switchDisplayMode();
+
+  if (currentDisplayMode == MODE_AI_USAGE)
+  {
+    Serial.println("Switching to AI Usage display");
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      updating = true;
+      downloadAndDrawAiUsage();
+      updating = false;
+    }
+    else
+    {
+      showCachedAiUsage();
+    }
+  }
+  else
+  {
+    Serial.println("Switching to Todo display");
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      cleanRunningValue();
+      updating = true;
+      downloadAndDrawTodo();
+      updating = false;
+    }
+  }
 }
 
 void buttonLongPress()
