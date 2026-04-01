@@ -1,0 +1,33 @@
+{
+  "$schema": "https://code.claude.com/schemas/settings.json",
+  "_comment": [
+    "Claude Code hooks configuration for AI usage tracking.",
+    "Copy to ~/.claude/settings.json (global) or .claude/settings.json (project).",
+    "Set EINKTODO_API_KEY in your shell profile for API push.",
+    "Set USAGE_PUSH_MODE=realtime for per-response push (default: session-end only)."
+  ],
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 __INSTALL_PATH__/tools/cc-usage-hook.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 __INSTALL_PATH__/tools/cc-usage-hook.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "name": "eink-ai-usage-tracker",
+  "displayName": "E-Ink AI Usage Tracker",
+  "description": "Track Cursor/Claude/Codex AI usage and push to e-ink dashboard",
+  "version": "0.1.0",
+  "publisher": "einktodo",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "einkUsage.showStats",
+        "title": "E-Ink: Show AI Usage Stats"
+      },
+      {
+        "command": "einkUsage.pushNow",
+        "title": "E-Ink: Push Usage to Dashboard"
+      },
+      {
+        "command": "einkUsage.resetStats",
+        "title": "E-Ink: Reset Usage Stats"
+      }
+    ],
+    "configuration": {
+      "title": "E-Ink AI Usage Tracker",
+      "properties": {
+        "einkUsage.apiUrl": {
+          "type": "string",
+          "default": "https://www.einktodo.com/api/display/v2",
+          "description": "einktodo API URL"
+        },
+        "einkUsage.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "einktodo API key"
+        },
+        "einkUsage.pushInterval": {
+          "type": "number",
+          "default": 300,
+          "description": "Auto-push interval in seconds (0 to disable)"
+        },
+        "einkUsage.trackClaude": {
+          "type": "boolean",
+          "default": true,
+          "description": "Track Claude Code usage from ~/.claude/"
+        },
+        "einkUsage.trackCursor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Track Cursor AI usage"
+        },
+        "einkUsage.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show usage stats in status bar"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}
