@@ -29,8 +29,17 @@ Environment:
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
+
+# Import window tracker (co-located in tools/)
+TOOLS_DIR = Path(__file__).parent
+sys.path.insert(0, str(TOOLS_DIR))
+try:
+    from usage_windows import UsageTracker, load_tracker, save_tracker
+    HAS_WINDOWS = True
+except ImportError:
+    HAS_WINDOWS = False
 
 try:
     import requests
@@ -58,6 +67,7 @@ def parse_transcript(transcript_path):
         "tools_used": {},
         "start_time": "",
         "end_time": "",
+        "api_entries": [],  # [{timestamp, tokens, model}] for window tracking
     }
 
     if not transcript_path or not Path(transcript_path).exists():
@@ -107,6 +117,13 @@ def parse_transcript(transcript_path):
                 if model not in stats["models"]:
                     stats["models"][model] = 0
                 stats["models"][model] += 1
+
+                # Collect per-API-call entries for window tracking
+                stats["api_entries"].append({
+                    "timestamp": ts,
+                    "tokens": input_t + output_t,
+                    "model": model,
+                })
 
             # Track tool usage
             content = msg.get("content", [])
@@ -199,7 +216,7 @@ def merge_stats(cumulative, session_stats):
     return cumulative
 
 
-def push_to_api(cumulative):
+def push_to_api(cumulative, window_summary=None):
     """Push cumulative stats to einktodo API."""
     api_url = os.environ.get("EINKTODO_API_URL", "https://www.einktodo.com/api/display/v2")
     api_key = os.environ.get("EINKTODO_API_KEY", "")
@@ -219,6 +236,10 @@ def push_to_api(cumulative):
             "total_api_calls": cumulative["total_api_calls"],
         },
     }
+
+    # Include window data if available
+    if window_summary:
+        payload["windows"] = window_summary
 
     try:
         resp = requests.post(
@@ -258,6 +279,27 @@ def main():
         print(json.dumps({}))
         return
 
+    # ── Window tracking (5h / weekly / per-model) ──
+    window_summary = None
+    if HAS_WINDOWS:
+        tracker = load_tracker("claude_code")
+        # Feed each API call into the window tracker
+        for api_entry in session_stats.get("api_entries", []):
+            try:
+                ts = datetime.fromisoformat(api_entry["timestamp"].replace("Z", "+00:00"))
+            except (ValueError, KeyError):
+                ts = datetime.now(timezone.utc)
+            tracker.record(
+                tokens=api_entry.get("tokens", 0),
+                model=api_entry.get("model", ""),
+                timestamp=ts,
+            )
+        save_tracker(tracker)
+        window_summary = tracker.summary()
+
+        # Print window status to stderr (visible in verbose mode)
+        print(tracker.format_status(), file=sys.stderr)
+
     # Load and merge cumulative stats
     cumulative = load_cumulative_stats()
 
@@ -275,20 +317,20 @@ def main():
         save_cumulative_stats(cumulative)
 
         if push_mode == "realtime":
-            push_to_api(cumulative)
+            push_to_api(cumulative, window_summary)
 
     elif event == "SessionEnd":
         # Finalize: merge this session's complete stats
         cumulative.pop("_current_session", None)
         cumulative = merge_stats(cumulative, session_stats)
         save_cumulative_stats(cumulative)
-        push_to_api(cumulative)
+        push_to_api(cumulative, window_summary)
 
     else:
         # Generic: merge and save
         cumulative = merge_stats(cumulative, session_stats)
         save_cumulative_stats(cumulative)
-        push_to_api(cumulative)
+        push_to_api(cumulative, window_summary)
 
     # Output empty JSON (hook protocol: exit 0 + valid JSON = proceed)
     print(json.dumps({}))
